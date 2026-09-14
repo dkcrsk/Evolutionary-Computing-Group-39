@@ -8,7 +8,7 @@ selection -- wired into ariel.ec's EA engine.
 
 Variant B (roulette-wheel) should share IDENTICAL crossover, mutation,
 population size, module budget, and evaluation budget -- only the parent
-selection step differs. Whoever builds Variant B can copy this file and
+selection step differs. Who builds Variant B can copy this file and
 swap only `tournament_selection` for a `roulette_selection` function with
 the same signature (population in, population out, tags["ps"] set) --
 everything else stays the same so the comparison isolates the one aspect
@@ -18,22 +18,18 @@ Assumes this file lives alongside A1_template_2026.py, tree_edit_distance.py,
 target_bodies/, and tournament_selection.py in the same directory.
 """
 
-# Standard library
 import copy
 import random
 from pathlib import Path
 from typing import Any
 
-# Third-party
 import numpy as np
 from rich.console import Console
 from rich.progress import track
 from rich.traceback import install
 
-# ARIEL: EA engine
 from ariel.ec import EA, EAOperation, EASettings, Individual, Population
 
-# ARIEL: genome + tree operators
 from ariel.ec.genotypes.tree.operators import (
     crossover_subtree,
     mutate_hoist,
@@ -44,34 +40,29 @@ from ariel.ec.genotypes.tree.operators import (
     validate_tree_depth,
 )
 from ariel.ec.genotypes.tree.operators import (
-    _prune_invalid_edges,  # pyright: ignore[reportPrivateUsage]  -- used this way in the course's own tree example
+    _prune_invalid_edges,  
 )
 from ariel.ec.genotypes.tree.tree_genome import TreeGenome
 
-# ARIEL: target loading (same helper as A1_template_2026.py)
 from ariel.body_phenotypes.robogen_lite.decoders._blueprint import (
     load_graph_from_json,
 )
 
-# Assignment fitness (from tree_edit_distance.py, same as A1_template_2026.py)
 from tree_edit_distance import mean_plus_std_tree_edit_distance
 
-# Your already-tested selection function -- reused here rather than
-# duplicated, so this file and tournament_selection.py never drift apart.
+
 from tournament_selection import tournament_selection
 
 install()
 console = Console()
 
-# ============================================================================ #
-#  CONFIGURATION -- shared with Variant B; only selection differs between them
-# ============================================================================ #
+
 
 POP_SIZE: int = 100
 BUDGET: int = 100  # generations
-NUM_MODULES: int = 20  # module budget per body, matches A1_template_2026.py
+NUM_MODULES: int = 20  # module budget per body, matches template
 MAX_DEPTH: int = 12  # cap tree depth to control bloat
-TOURNAMENT_K: int = 5  # fixed hyperparameter, NOT the studied variable
+TOURNAMENT_K: int = 5  # fixed hyperparameter
 SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover vs. clone-then-mutate
 
 SEEDS: list[int] = [42, 43, 44, 45, 46]  # >=5 independent runs, per the assignment
@@ -96,14 +87,9 @@ def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
 TARGETS: list[Any] = load_targets()
 
 
-# ============================================================================ #
-#  GENOME / BODY HELPERS
-# ============================================================================ #
 
 
 def is_connected_tree(genome: TreeGenome) -> bool:
-    """Check the genome decodes to one connected tree -- guards against
-    crossover producing a disconnected graph."""
     if len(genome.nodes) == 0:
         return False
     graph = genome.to_networkx()
@@ -123,9 +109,7 @@ def is_connected_tree(genome: TreeGenome) -> bool:
 
 
 def body_fitness(genome: TreeGenome) -> float:
-    """The assignment's actual fitness: mean + std tree edit distance to the
-    5 targets. Lower is better. Invalid/disconnected genomes get the worst
-    possible score so selection/survival always eliminates them."""
+    
     if not is_connected_tree(genome):
         return float("inf")
     body = genome.to_networkx()
@@ -134,14 +118,10 @@ def body_fitness(genome: TreeGenome) -> float:
     return mean_plus_std_tree_edit_distance(body, TARGETS)
 
 
-# ============================================================================ #
-#  EA STEPS
-# ============================================================================ #
 
 
 def create_individual() -> Individual:
-    """One randomly-initialised individual. Genome stored as a dict so
-    ariel.ec's SQLite persistence can serialise it (TreeGenome.to_dict())."""
+    
     while True:
         genome = random_tree(max_modules=NUM_MODULES)
         if len(genome.nodes) > 0:
@@ -153,8 +133,7 @@ def create_individual() -> Individual:
 
 
 def evaluate(population: Population) -> Population:
-    """Score every individual that needs it against the target set. Runs
-    after init and after every reproduction step."""
+    
     to_eval = [ind for ind in population if ind.alive and ind.requires_eval]
     for ind in track(to_eval, description="Evaluating..."):
         genome = TreeGenome.from_dict(ind.genotype)
@@ -164,9 +143,7 @@ def evaluate(population: Population) -> Population:
 
 
 def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
-    """One crossover between two parent genomes. Falls back to a copy of a
-    parent if the result is disconnected (a known possibility with subtree
-    crossover on variable-length tree genomes)."""
+    
     t1 = TreeGenome.from_dict(parent1.genotype)
     t2 = TreeGenome.from_dict(parent2.genotype)
     child1, child2 = crossover_subtree(t1, t2)
@@ -177,8 +154,7 @@ def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
 
 
 def mutate_body(genome: TreeGenome) -> TreeGenome:
-    """Mutation: mixes point/subtree/shrink/hoist operators with fixed
-    probabilities. Shared with Variant B -- only selection differs."""
+    
     new = copy.deepcopy(genome)
     mutation_type = rng.choice(
         ["point", "subtree", "shrink", "hoist"],
@@ -197,11 +173,7 @@ def mutate_body(genome: TreeGenome) -> TreeGenome:
 
 
 def reproduction(population: Population) -> Population:
-    """Crossover + mutation: builds offspring from tournament-tagged parents
-    until the pool reaches 2x population size (the extra half gets cut by
-    survivor_selection -- a (mu+lambda)-style generation). Falls back to
-    asexual reproduction (clone + mutate) if fewer than 2 parents are
-    available, or with probability (1 - SEXUAL_REPRODUCTION_RATE)."""
+    
     parents = [ind for ind in population if ind.tags.get("ps", False)]
     if not parents:
         console.log("[yellow]No parents tagged -- using entire population[/yellow]")
@@ -242,8 +214,7 @@ def reproduction(population: Population) -> Population:
 
 
 def survivor_selection(population: Population) -> Population:
-    """Truncation survivor selection: keep the best POP_SIZE individuals
-    (lowest fitness). Shared with Variant B."""
+    
     population = population.sort(sort="min", attribute="fitness_")
     survivors = population[:POP_SIZE]
     for ind in population:
@@ -263,15 +234,11 @@ def survivor_selection(population: Population) -> Population:
     return population
 
 
-# ============================================================================ #
-#  ENTRY POINT
-# ============================================================================ #
+
 
 
 def run_one(seed: int) -> Individual | None:
-    """One independent run of Variant A. Returns the best individual found.
-    Per-generation fitness is persisted automatically to this run's own
-    SQLite database (one file per seed) by ariel.ec."""
+    
     global rng
     random.seed(seed)
     rng = np.random.default_rng(seed)
@@ -308,7 +275,7 @@ def run_one(seed: int) -> Individual | None:
 
 
 def main() -> None:
-    """Run Variant A over 5 independent seeds, as the assignment requires."""
+
     console.rule("[bold purple]Variant A: Tournament Selection[/bold purple]")
     console.log(
         f"Population: {POP_SIZE}, Generations: {BUDGET}, "
