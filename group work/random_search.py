@@ -1,16 +1,5 @@
-"""Random-search baseline for the group's Assignment 1 experiment.
-
-Samples random tree bodies with the SAME generator the EA uses for its
-initial population, scores each with the SAME fitness (mean + std tree
-edit distance to the 5 targets), and tracks the best-so-far.
-No selection, no variation -- this is the "no evolution" control.
-
-Logs one row every `log_every` evaluations so it lines up with the EA's
-generations (population 100 -> log every 100).
-
-Assumes this file lives alongside tree_edit_distance.py and target_bodies/
-(same folder as the variant A / B files).
-"""
+"""Random-search baseline: samples random tree bodies with the same generator
+and fitness as the EA, tracks the best-so-far. No selection, no variation."""
 
 import random
 from pathlib import Path
@@ -27,13 +16,12 @@ from tree_edit_distance import mean_plus_std_tree_edit_distance
 
 console = Console()
 
-NUM_MODULES: int = 20  # same module budget as the EA
+NUM_MODULES: int = 20
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"
 
 
 def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
-    """Load the fixed target bodies (identical for every run/seed/variant)."""
     paths = sorted(target_dir.glob("*.json"))
     if not paths:
         msg = f"no target bodies found in {target_dir}"
@@ -42,11 +30,6 @@ def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
 
 
 def random_body_fitness(targets: list[Any]) -> tuple[float, int]:
-    """Make ONE random body and return (fitness, number_of_modules).
-
-    Uses random_tree with the module budget, exactly like the EA's
-    create_individual(). Empty trees are re-sampled.
-    """
     while True:
         genome = random_tree(max_modules=NUM_MODULES)
         if len(genome.nodes) > 0:
@@ -61,11 +44,6 @@ def random_search(
     evaluations: int = 10_100,
     log_every: int = 100,
 ) -> list[dict[str, float]]:
-    """Run random search and return one log row per `log_every` evaluations.
-
-    Row keys (the group's shared CSV schema):
-        generation, evaluations, best_fitness, mean_fitness, mean_modules
-    """
     rows: list[dict[str, float]] = []
     best = float("inf")
     block_fits: list[float] = []
@@ -74,7 +52,7 @@ def random_search(
     for i in range(1, evaluations + 1):
         fit, mods = random_body_fitness(targets)
         if fit < best:
-            best = fit  # best-so-far, never goes up
+            best = fit
         block_fits.append(fit)
         block_mods.append(mods)
 
@@ -100,9 +78,9 @@ if __name__ == "__main__":
     t = load_targets()
     out = random_search(t, evaluations=300, log_every=100)
 
-    assert len(out) == 3, "expected 3 log rows"
+    assert len(out) == 3
     bests = [r["best_fitness"] for r in out]
-    assert bests == sorted(bests, reverse=True), "best_fitness must never go up"
+    assert bests == sorted(bests, reverse=True)
     for r in out:
         console.log(r)
     console.log("[green]Self-test passed.[/green]")

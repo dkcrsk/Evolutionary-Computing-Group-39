@@ -1,9 +1,5 @@
 """Random-search baseline runner: 5 seeds, same evaluation budget as the EA,
-one CSV per seed in results/random/seed_<N>.csv.
-
-Assumes this file lives alongside random_search.py, tree_edit_distance.py
-and target_bodies/ (same folder as the variant A / B files).
-"""
+one CSV per seed in results/random/seed_<N>.csv."""
 
 import csv
 import random
@@ -17,9 +13,9 @@ from random_search import load_targets, random_search
 
 console = Console()
 
-EVALUATIONS: int = 10_100  # 100 initial + 100 per generation x 100 gens = variant A/B budget
-LOG_EVERY: int = 100  # = population size -> one row per "generation"
-SEEDS: list[int] = [42, 43, 44, 45, 46]  # same seeds as variant A / B
+EVALUATIONS: int = 10_100
+LOG_EVERY: int = 100
+SEEDS: list[int] = [42, 43, 44, 45, 46]
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "random"
@@ -29,7 +25,6 @@ FIELDS = ["generation", "evaluations", "best_fitness", "mean_fitness", "mean_mod
 
 
 def run_one(seed: int, targets: list[Any]) -> float:
-    """Run one seed, write its CSV, return the final best fitness."""
     random.seed(seed)
     np.random.seed(seed)
     rows = random_search(targets, evaluations=EVALUATIONS, log_every=LOG_EVERY)
