@@ -1,26 +1,34 @@
 """Variant B: Tree-based EA using ROULETTE-WHEEL (fitness-proportionate)
 selection.
 
-Research question: tournament vs. roulette-wheel selection (this group's
-Variant A vs Variant B). Identical to variant_a_tournament.py in every
-respect -- population init, crossover, mutation, population size, module
-budget, evaluation budget, survivor selection -- except the parent
-selection step, so the comparison isolates that one operator.
+Research question: tournament vs. roulette-wheel selection. Population
+init, crossover, mutation, population size, module budget, and evaluation
+budget match Variant A exactly -- only parent selection differs, isolating
+that one operator.
 
+Logs results/variant_b/seed_<N>.csv (generation, evaluations, best_fitness,
+mean_fitness, mean_modules) and seed_<N>_selection_pressure.csv (generation,
+evaluations, mean_parent_fitness), matching Variant A's and the baseline's
+CSV format.
 """
 
+# Standard library
 import copy
+import csv
 import random
 from pathlib import Path
 from typing import Any
 
+# Third-party
 import numpy as np
 from rich.console import Console
 from rich.progress import track
 from rich.traceback import install
 
+# ARIEL: EA engine
 from ariel.ec import EA, EAOperation, EASettings, Individual, Population
 
+# ARIEL: genome + tree operators
 from ariel.ec.genotypes.tree.operators import (
     crossover_subtree,
     mutate_hoist,
@@ -31,22 +39,24 @@ from ariel.ec.genotypes.tree.operators import (
     validate_tree_depth,
 )
 from ariel.ec.genotypes.tree.operators import (
-    _prune_invalid_edges,
+    _prune_invalid_edges,  # pyright: ignore[reportPrivateUsage]  -- used this way in the course's own tree example
 )
 from ariel.ec.genotypes.tree.tree_genome import TreeGenome
 
+# ARIEL: target loading (same helper as A1_template_2026.py)
 from ariel.body_phenotypes.robogen_lite.decoders._blueprint import (
     load_graph_from_json,
 )
 
+# Assignment fitness (from tree_edit_distance.py, same as A1_template_2026.py)
 from tree_edit_distance import mean_plus_std_tree_edit_distance
 
-
+# Your already-tested selection function -- reused here rather than
+# duplicated, so this file and roulette_selection.py never drift apart.
 from roulette_selection import roulette_selection
 
 install()
 console = Console()
-
 
 
 POP_SIZE: int = 100
@@ -54,20 +64,28 @@ BUDGET: int = 100  # generations
 NUM_MODULES: int = 20  # module budget per body, matches template
 MAX_DEPTH: int = 12  # cap tree depth to control bloat
 SELECTION_K: int = 5  # sets n // k parents selected, matches Variant A's tournament size
-SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover vs. clone-then-mutate
+SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover
 
-SEEDS: list[int] = [42, 43, 44, 45, 46]  # >=5 independent runs, per the assignment
+SEEDS: list[int] = [42, 43, 44, 45, 46]
 
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"
 DATA = Path.cwd() / "__data__" / Path(__file__).stem
 DATA.mkdir(parents=True, exist_ok=True)
 
+RESULTS = HERE / "results" / "variant_b"
+RESULTS.mkdir(parents=True, exist_ok=True)
+FIELDS = ["generation", "evaluations", "best_fitness", "mean_fitness", "mean_modules"]
+SELECTION_FIELDS = ["generation", "evaluations", "mean_parent_fitness"]
+
 rng = np.random.default_rng(SEEDS[0])
+
+_state: dict[str, int] = {"generation": 0, "evaluations": 0}
+_rows: list[dict[str, float]] = []
+_selection_rows: list[dict[str, float]] = []
 
 
 def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
-    """Load the fixed target bodies (identical for every run/seed/variant)."""
     paths = sorted(target_dir.glob("*.json"))
     if not paths:
         msg = f"no target bodies found in {target_dir}"
@@ -76,8 +94,6 @@ def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
 
 
 TARGETS: list[Any] = load_targets()
-
-
 
 
 def is_connected_tree(genome: TreeGenome) -> bool:
@@ -99,20 +115,21 @@ def is_connected_tree(genome: TreeGenome) -> bool:
     return len(reachable) == graph.number_of_nodes()
 
 
-def body_fitness(genome: TreeGenome) -> float:
-
+def body_fitness(genome: TreeGenome) -> tuple[float, int]:
+    """Fitness function for a single body genome. Returns the mean+std
+    tree edit distance and the body's module count.
+    """
     if not is_connected_tree(genome):
-        return float("inf")
+        return float("inf"), 0
     body = genome.to_networkx()
     if body.number_of_nodes() == 0:
-        return float("inf")
-    return mean_plus_std_tree_edit_distance(body, TARGETS)
-
-
+        return float("inf"), 0
+    fitness = mean_plus_std_tree_edit_distance(body, TARGETS)
+    return fitness, body.number_of_nodes()
 
 
 def create_individual() -> Individual:
-
+    """Create a single random individual with a valid genome and no fitness."""
     while True:
         genome = random_tree(max_modules=NUM_MODULES)
         if len(genome.nodes) > 0:
@@ -124,17 +141,39 @@ def create_individual() -> Individual:
 
 
 def evaluate(population: Population) -> Population:
-
+    """Evaluate all individuals in the population that require evaluation."""
     to_eval = [ind for ind in population if ind.alive and ind.requires_eval]
     for ind in track(to_eval, description="Evaluating..."):
         genome = TreeGenome.from_dict(ind.genotype)
-        ind.fitness = body_fitness(genome)
+        fitness, num_modules = body_fitness(genome)
+        ind.fitness = fitness
+        ind.tags["modules"] = num_modules
         ind.requires_eval = False
+        _state["evaluations"] += 1
+    return population
+
+
+def tick_generation(population: Population) -> Population:
+    _state["generation"] += 1
+    return population
+
+
+def log_selection_pressure(population: Population) -> Population:
+    parents = [
+        ind for ind in population
+        if ind.tags.get("ps", False) and ind.fitness_ is not None
+    ]
+    if parents:
+        mean_parent_fitness = float(np.mean([ind.fitness_ for ind in parents]))
+        _selection_rows.append({
+            "generation": _state["generation"],
+            "evaluations": _state["evaluations"],
+            "mean_parent_fitness": mean_parent_fitness,
+        })
     return population
 
 
 def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
-
     t1 = TreeGenome.from_dict(parent1.genotype)
     t2 = TreeGenome.from_dict(parent2.genotype)
     child1, child2 = crossover_subtree(t1, t2)
@@ -145,7 +184,6 @@ def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
 
 
 def mutate_body(genome: TreeGenome) -> TreeGenome:
-
     new = copy.deepcopy(genome)
     mutation_type = rng.choice(
         ["point", "subtree", "shrink", "hoist"],
@@ -164,7 +202,6 @@ def mutate_body(genome: TreeGenome) -> TreeGenome:
 
 
 def reproduction(population: Population) -> Population:
-
     parents = [ind for ind in population if ind.tags.get("ps", False)]
     if not parents:
         console.log("[yellow]No parents tagged -- using entire population[/yellow]")
@@ -205,7 +242,6 @@ def reproduction(population: Population) -> Population:
 
 
 def survivor_selection(population: Population) -> Population:
-
     population = population.sort(sort="min", attribute="fitness_")
     survivors = population[:POP_SIZE]
     for ind in population:
@@ -217,21 +253,42 @@ def survivor_selection(population: Population) -> Population:
         for ind in survivors
         if ind.fitness_ is not None and ind.fitness_ != float("inf")
     ]
+    mods = [
+        ind.tags.get("modules", 0)
+        for ind in survivors
+        if ind.fitness_ is not None and ind.fitness_ != float("inf")
+    ]
     if fits:
+        best_fitness = min(fits)
+        mean_fitness = float(np.mean(fits))
+        mean_modules = float(np.mean(mods)) if mods else 0.0
         console.log(
-            f"[green]Gen stats -- best={min(fits):.4f} "
-            f"mean={np.mean(fits):.4f} worst={max(fits):.4f}[/green]",
+            f"[green]Gen {_state['generation']} stats -- best={best_fitness:.4f} "
+            f"mean={mean_fitness:.4f} mean_modules={mean_modules:.2f}[/green]",
         )
+        _rows.append({
+            "generation": _state["generation"],
+            "evaluations": _state["evaluations"],
+            "best_fitness": best_fitness,
+            "mean_fitness": mean_fitness,
+            "mean_modules": mean_modules,
+        })
     return population
 
 
+def select_parents(population: Population) -> Population:
+    return roulette_selection(population, k=SELECTION_K)
 
 
 def run_one(seed: int) -> Individual | None:
-
     global rng
     random.seed(seed)
     rng = np.random.default_rng(seed)
+
+    _state["generation"] = 0
+    _state["evaluations"] = 0
+    _rows.clear()
+    _selection_rows.clear()
 
     settings = EASettings(
         is_maximisation=False,
@@ -245,7 +302,9 @@ def run_one(seed: int) -> Individual | None:
     population = evaluate(population)
 
     ops = [
-        EAOperation(roulette_selection),
+        tick_generation,
+        EAOperation(select_parents),
+        log_selection_pressure,
         EAOperation(reproduction),
         EAOperation(evaluate),
         EAOperation(survivor_selection),
@@ -261,11 +320,26 @@ def run_one(seed: int) -> Individual | None:
         quiet=settings.quiet,
     )
     ea.run()
+
+    stats_path = RESULTS / f"seed_{seed}.csv"
+    with stats_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(_rows)
+    console.log(f"saved {stats_path}")
+
+    selection_path = RESULTS / f"seed_{seed}_selection_pressure.csv"
+    with selection_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=SELECTION_FIELDS)
+        writer.writeheader()
+        writer.writerows(_selection_rows)
+    console.log(f"saved {selection_path}")
+
     return ea.get_solution("best", only_alive=False)
 
 
 def main() -> None:
-
+    """Run Variant B over 5 independent seeds, as the assignment requires."""
     console.rule("[bold purple]Variant B: Roulette-Wheel Selection[/bold purple]")
     console.log(
         f"Population: {POP_SIZE}, Generations: {BUDGET}, "

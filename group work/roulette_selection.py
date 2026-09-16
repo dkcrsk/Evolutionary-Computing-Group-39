@@ -1,22 +1,11 @@
-"""Roulette-wheel (fitness-proportionate) selection (Variant B) for the
-group's tree-based EA.
+"""Roulette-wheel (fitness-proportionate) selection (Variant B).
 
-Research question: tournament vs. roulette-wheel selection.
-This file implements the roulette-selection side of that comparison.
+Same interface and same number of selected parents as tournament selection
+(n // k) -- the variants differ only in *how* parents are chosen, not
+*how many*.
 
-Same interface and same number of selected parents as tournament_selection
-(n // k), so the two variants differ ONLY in *how* parents are chosen, not
-*how many* -- that's what isolates the comparison.
-
-Drops into the group's shared `ops` list as a direct replacement for
-tournament_selection:
-
-    ops = [
-        EAOperation(roulette_selection),     # <- this file
-        EAOperation(reproduction),           # crossover + mutation (teammate)
-        EAOperation(evaluate),               # fitness (shared, from A1 template)
-        EAOperation(survivor_selection),     # (teammate)
-    ]
+Logging-free by design; per-generation and selection-pressure CSV logging
+live in variant_b_roulette.py instead.
 """
 
 import random
