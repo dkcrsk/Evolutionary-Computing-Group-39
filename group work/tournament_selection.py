@@ -25,44 +25,12 @@ console = Console()
 
 
 def _fitness_key(ind: Individual) -> float:
-    """Sort key for an individual's fitness. Treats an unevaluated (None)
-    individual as worst-possible (+inf), since lower is better here -- this
-    also satisfies the type checker, which otherwise can't guarantee `min()`
-    always receives a comparable float rather than `float | None`.
-    """
+    
     return ind.fitness_ if ind.fitness_ is not None else float("inf")
 
 
 def tournament_selection(population: Population, k: int = 5) -> Population:
-    """Select parents via tournament selection.
-
-    Partitions a shuffled population into non-overlapping groups of size k;
-    each group's winner (lowest `.fitness_` -- tree edit distance, lower is
-    better) is tagged `ind.tags["ps"] = True`, matching this codebase's
-    parent-selection convention (`reproduction()` reads
-    `ind.tags.get("ps", False)`).
-
-    Produces floor(len(population) / k) parents per generation, not
-    len(population) -- non-overlapping groups rather than resampling with
-    replacement. Coordinate k with the rest of the group so the parent
-    count stays reasonable relative to population size (e.g. pop=100,
-    k=5 -> 20 parents, plenty for crossover).
-
-    Parameters
-    ----------
-    population : Population
-        The current, already-evaluated population (every individual must
-        have `.fitness_` set -- i.e. this runs AFTER the evaluate step).
-    k : int
-        Tournament size. Fixed as a reported hyperparameter, not tuned --
-        the research question is selection MECHANISM (tournament vs.
-        roulette), not tournament size.
-
-    Returns
-    -------
-    Population
-        The same individuals, shuffled, with `.tags["ps"]` set.
-    """
+    
     shuffled = population.shuffle()
     n = len(shuffled)
 
@@ -81,11 +49,7 @@ def tournament_selection(population: Population, k: int = 5) -> Population:
     return shuffled
 
 
-# ============================================================================ #
-#  SELF-TEST -- run this file directly to sanity-check the logic in isolation,
-#  with fake fitness values, before your teammates' crossover/mutation/evaluate
-#  code exists. `uv run tournament_selection.py`
-# ============================================================================ #
+
 
 if __name__ == "__main__":
     random.seed(42)
@@ -104,8 +68,7 @@ if __name__ == "__main__":
     for ind in selected:
         console.log(f"  selected parent fitness_ = {ind.fitness_}")
 
-    # sanity check: within each group of 5, the selected one should really
-    # be the lowest-fitness individual in that group
+    
     unselected = [ind for ind in pop if not ind.tags.get("ps", False)]
     if selected and unselected:
         assert min(ind.fitness_ for ind in selected) <= min(
