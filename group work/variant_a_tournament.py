@@ -8,7 +8,7 @@ selection -- wired into ariel.ec's EA engine.
 
 Variant B (roulette-wheel) should share IDENTICAL crossover, mutation,
 population size, module budget, and evaluation budget -- only the parent
-selection step differs. Whoever builds Variant B can copy this file and
+selection step differs. Who builds Variant B can copy this file and
 swap only `tournament_selection` for a `roulette_selection` function with
 the same signature (population in, population out, tags["ps"] set) --
 everything else stays the same so the comparison isolates the one aspect
@@ -63,18 +63,15 @@ from tournament_selection import tournament_selection
 install()
 console = Console()
 
-# ============================================================================ #
-#  CONFIGURATION -- shared with Variant B; only selection differs between them
-# ============================================================================ #
 
 POP_SIZE: int = 100
 BUDGET: int = 100  # generations
-NUM_MODULES: int = 20  # module budget per body, matches A1_template_2026.py
+NUM_MODULES: int = 20  # module budget per body, matches template
 MAX_DEPTH: int = 12  # cap tree depth to control bloat
-TOURNAMENT_K: int = 5  # fixed hyperparameter, NOT the studied variable
-SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover vs. clone-then-mutate
+TOURNAMENT_K: int = 5  # fixed hyperparameter
+SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover
 
-SEEDS: list[int] = [42, 43, 44, 45, 46]  # >=5 independent runs, per the assignment
+SEEDS: list[int] = [42, 43, 44, 45, 46]
 
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"
@@ -85,7 +82,6 @@ rng = np.random.default_rng(SEEDS[0])
 
 
 def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
-    """Load the fixed target bodies (identical for every run/seed/variant)."""
     paths = sorted(target_dir.glob("*.json"))
     if not paths:
         msg = f"no target bodies found in {target_dir}"
@@ -96,14 +92,10 @@ def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
 TARGETS: list[Any] = load_targets()
 
 
-# ============================================================================ #
-#  GENOME / BODY HELPERS
-# ============================================================================ #
+
 
 
 def is_connected_tree(genome: TreeGenome) -> bool:
-    """Check the genome decodes to one connected tree -- guards against
-    crossover producing a disconnected graph."""
     if len(genome.nodes) == 0:
         return False
     graph = genome.to_networkx()
@@ -123,9 +115,7 @@ def is_connected_tree(genome: TreeGenome) -> bool:
 
 
 def body_fitness(genome: TreeGenome) -> float:
-    """The assignment's actual fitness: mean + std tree edit distance to the
-    5 targets. Lower is better. Invalid/disconnected genomes get the worst
-    possible score so selection/survival always eliminates them."""
+    """Fitness function for a single body genome. Returns the mean+std"""
     if not is_connected_tree(genome):
         return float("inf")
     body = genome.to_networkx()
@@ -134,14 +124,11 @@ def body_fitness(genome: TreeGenome) -> float:
     return mean_plus_std_tree_edit_distance(body, TARGETS)
 
 
-# ============================================================================ #
-#  EA STEPS
-# ============================================================================ #
+
 
 
 def create_individual() -> Individual:
-    """One randomly-initialised individual. Genome stored as a dict so
-    ariel.ec's SQLite persistence can serialise it (TreeGenome.to_dict())."""
+    """Create a single random individual with a valid genome and no fitness."""
     while True:
         genome = random_tree(max_modules=NUM_MODULES)
         if len(genome.nodes) > 0:
@@ -153,8 +140,7 @@ def create_individual() -> Individual:
 
 
 def evaluate(population: Population) -> Population:
-    """Score every individual that needs it against the target set. Runs
-    after init and after every reproduction step."""
+    """Evaluate all individuals in the population that require evaluation."""
     to_eval = [ind for ind in population if ind.alive and ind.requires_eval]
     for ind in track(to_eval, description="Evaluating..."):
         genome = TreeGenome.from_dict(ind.genotype)
@@ -164,9 +150,6 @@ def evaluate(population: Population) -> Population:
 
 
 def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
-    """One crossover between two parent genomes. Falls back to a copy of a
-    parent if the result is disconnected (a known possibility with subtree
-    crossover on variable-length tree genomes)."""
     t1 = TreeGenome.from_dict(parent1.genotype)
     t2 = TreeGenome.from_dict(parent2.genotype)
     child1, child2 = crossover_subtree(t1, t2)
@@ -177,8 +160,6 @@ def crossover_bodies(parent1: Individual, parent2: Individual) -> TreeGenome:
 
 
 def mutate_body(genome: TreeGenome) -> TreeGenome:
-    """Mutation: mixes point/subtree/shrink/hoist operators with fixed
-    probabilities. Shared with Variant B -- only selection differs."""
     new = copy.deepcopy(genome)
     mutation_type = rng.choice(
         ["point", "subtree", "shrink", "hoist"],
@@ -197,11 +178,6 @@ def mutate_body(genome: TreeGenome) -> TreeGenome:
 
 
 def reproduction(population: Population) -> Population:
-    """Crossover + mutation: builds offspring from tournament-tagged parents
-    until the pool reaches 2x population size (the extra half gets cut by
-    survivor_selection -- a (mu+lambda)-style generation). Falls back to
-    asexual reproduction (clone + mutate) if fewer than 2 parents are
-    available, or with probability (1 - SEXUAL_REPRODUCTION_RATE)."""
     parents = [ind for ind in population if ind.tags.get("ps", False)]
     if not parents:
         console.log("[yellow]No parents tagged -- using entire population[/yellow]")
@@ -219,8 +195,8 @@ def reproduction(population: Population) -> Population:
 
         child_genome = mutate_body(child_genome)
 
-        # Repair loop: keep mutating until valid, or give up and use a fresh
-        # random genome after 20 attempts (rare in practice).
+        """Repair loop: keep mutating until valid, or give up and use a fresh 
+        random genome after 20 attempts (rare in practice)."""
         attempts = 0
         while not (
             len(child_genome.nodes) > 0
@@ -242,8 +218,6 @@ def reproduction(population: Population) -> Population:
 
 
 def survivor_selection(population: Population) -> Population:
-    """Truncation survivor selection: keep the best POP_SIZE individuals
-    (lowest fitness). Shared with Variant B."""
     population = population.sort(sort="min", attribute="fitness_")
     survivors = population[:POP_SIZE]
     for ind in population:
@@ -263,15 +237,9 @@ def survivor_selection(population: Population) -> Population:
     return population
 
 
-# ============================================================================ #
-#  ENTRY POINT
-# ============================================================================ #
 
 
 def run_one(seed: int) -> Individual | None:
-    """One independent run of Variant A. Returns the best individual found.
-    Per-generation fitness is persisted automatically to this run's own
-    SQLite database (one file per seed) by ariel.ec."""
     global rng
     random.seed(seed)
     rng = np.random.default_rng(seed)

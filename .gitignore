@@ -274,3 +274,8 @@ RECYCLE.BIN/
 *.msp
 # Windows shortcuts
 *.lnk
+
+.venv/
+__data__/
+__pycache__/
+*.db
