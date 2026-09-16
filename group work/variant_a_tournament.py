@@ -20,6 +20,7 @@ target_bodies/, and tournament_selection.py in the same directory.
 
 # Standard library
 import copy
+import csv
 import random
 from pathlib import Path
 from typing import Any
@@ -78,7 +79,16 @@ TARGET_DIR = HERE / "target_bodies"
 DATA = Path.cwd() / "__data__" / Path(__file__).stem
 DATA.mkdir(parents=True, exist_ok=True)
 
+RESULTS = HERE / "results" / "variant_a"
+RESULTS.mkdir(parents=True, exist_ok=True)
+FIELDS = ["generation", "evaluations", "best_fitness", "mean_fitness", "mean_modules"]
+SELECTION_FIELDS = ["generation", "evaluations", "mean_parent_fitness"]
+
 rng = np.random.default_rng(SEEDS[0])
+
+_state: dict[str, int] = {"generation": 0, "evaluations": 0}
+_rows: list[dict[str, float]] = []
+_selection_rows: list[dict[str, float]] = []
 
 
 def load_targets(target_dir: Path = TARGET_DIR) -> list[Any]:
@@ -114,14 +124,15 @@ def is_connected_tree(genome: TreeGenome) -> bool:
     return len(reachable) == graph.number_of_nodes()
 
 
-def body_fitness(genome: TreeGenome) -> float:
+def body_fitness(genome: TreeGenome) -> tuple[float, int]:
     """Fitness function for a single body genome. Returns the mean+std"""
     if not is_connected_tree(genome):
-        return float("inf")
+        return float("inf"), 0
     body = genome.to_networkx()
     if body.number_of_nodes() == 0:
-        return float("inf")
-    return mean_plus_std_tree_edit_distance(body, TARGETS)
+        return float("inf"), 0
+    fitness = mean_plus_std_tree_edit_distance(body, TARGETS)
+    return fitness, body.number_of_nodes()
 
 
 
@@ -144,8 +155,29 @@ def evaluate(population: Population) -> Population:
     to_eval = [ind for ind in population if ind.alive and ind.requires_eval]
     for ind in track(to_eval, description="Evaluating..."):
         genome = TreeGenome.from_dict(ind.genotype)
-        ind.fitness = body_fitness(genome)
+        fitness, num_modules = body_fitness(genome)
+        ind.fitness = fitness
+        ind.tags["modules"] = num_modules
         ind.requires_eval = False
+        _state["evaluations"] += 1
+    return population
+
+def tick_generation(population: Population) -> Population:
+    _state["generation"] += 1
+    return population
+
+def log_selection_pressure(population: Population) -> Population:
+    parents = [
+        ind for ind in population
+        if ind.tags.get("ps", False) and ind.fitness_ is not None
+    ]
+    if parents:
+        mean_parent_fitness = float(np.mean([ind.fitness_ for ind in parents]))
+        _selection_rows.append({
+            "generation": _state["generation"],
+            "evaluations": _state["evaluations"],
+            "mean_parent_fitness": mean_parent_fitness,
+        })
     return population
 
 
@@ -223,27 +255,50 @@ def survivor_selection(population: Population) -> Population:
     for ind in population:
         if ind not in survivors:
             ind.alive = False
-
+ 
     fits = [
         ind.fitness_
         for ind in survivors
         if ind.fitness_ is not None and ind.fitness_ != float("inf")
     ]
+    mods = [
+        ind.tags.get("modules", 0)
+        for ind in survivors
+        if ind.fitness_ is not None and ind.fitness_ != float("inf")
+    ]
     if fits:
+        best_fitness = min(fits)
+        mean_fitness = float(np.mean(fits))
+        mean_modules = float(np.mean(mods)) if mods else 0.0
         console.log(
-            f"[green]Gen stats -- best={min(fits):.4f} "
-            f"mean={np.mean(fits):.4f} worst={max(fits):.4f}[/green]",
+            f"[green]Gen {_state['generation']} stats -- best={best_fitness:.4f} "
+            f"mean={mean_fitness:.4f} mean_modules={mean_modules:.2f}[/green]",
         )
+        _rows.append({
+            "generation": _state["generation"],
+            "evaluations": _state["evaluations"],
+            "best_fitness": best_fitness,
+            "mean_fitness": mean_fitness,
+            "mean_modules": mean_modules,
+        })
     return population
 
 
-
+def select_parents(population: Population) -> Population:
+    return tournament_selection(population, k=TOURNAMENT_K)
 
 def run_one(seed: int) -> Individual | None:
+    
     global rng
     random.seed(seed)
     rng = np.random.default_rng(seed)
-
+ 
+    
+    _state["generation"] = 0
+    _state["evaluations"] = 0
+    _rows.clear()
+    _selection_rows.clear()
+ 
     settings = EASettings(
         is_maximisation=False,
         num_steps=BUDGET,
@@ -251,17 +306,19 @@ def run_one(seed: int) -> Individual | None:
         output_folder=DATA,
         db_file_name=f"variant_a_seed{seed}.db",
     )
-
+ 
     population = Population([create_individual() for _ in range(POP_SIZE)])
     population = evaluate(population)
-
+ 
     ops = [
-        EAOperation(tournament_selection),
+        tick_generation,
+        EAOperation(select_parents),
+        log_selection_pressure,
         EAOperation(reproduction),
         EAOperation(evaluate),
         EAOperation(survivor_selection),
     ]
-
+ 
     ea = EA(
         population,
         operations=ops,
@@ -272,8 +329,22 @@ def run_one(seed: int) -> Individual | None:
         quiet=settings.quiet,
     )
     ea.run()
+ 
+    stats_path = RESULTS / f"seed_{seed}.csv"
+    with stats_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(_rows)
+    console.log(f"saved {stats_path}")
+ 
+    selection_path = RESULTS / f"seed_{seed}_selection_pressure.csv"
+    with selection_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=SELECTION_FIELDS)
+        writer.writeheader()
+        writer.writerows(_selection_rows)
+    console.log(f"saved {selection_path}")
+ 
     return ea.get_solution("best", only_alive=False)
-
 
 def main() -> None:
     """Run Variant A over 5 independent seeds, as the assignment requires."""
