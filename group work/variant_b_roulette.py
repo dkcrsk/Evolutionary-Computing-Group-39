@@ -224,6 +224,8 @@ def reproduction(population: Population) -> Population:
         attempts = 0
         while not (
             len(child_genome.nodes) > 0
+            # added cap to the mutation crossover operator
+            and len(child_genome.nodes) <= NUM_MODULES + 1
             and validate_tree_depth(child_genome, MAX_DEPTH)
         ):
             child_genome = mutate_body(child_genome)
