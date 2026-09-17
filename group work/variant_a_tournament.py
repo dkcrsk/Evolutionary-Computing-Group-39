@@ -232,7 +232,7 @@ def reproduction(population: Population) -> Population:
         attempts = 0
         while not (
             len(child_genome.nodes) > 0
-            # added max cap to the crossover operator
+            # cap body size at the module budget (20 + core)
             and len(child_genome.nodes) <= NUM_MODULES + 1
             and validate_tree_depth(child_genome, MAX_DEPTH)
         ):
