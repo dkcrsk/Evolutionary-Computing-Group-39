@@ -77,7 +77,7 @@ ELITE_COUNT: int = 2  # survivors guaranteed from the OLD population each gen; r
 SelectionVariant = Literal["baseline", "sigma"]
 SELECTION_VARIANT: SelectionVariant = "baseline" # no noticeable difference with 5 seeds, but baseline is more robust
 
-SEEDS: list[int] = [42, 43, 44, 45, 46]
+SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50] 
 
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"

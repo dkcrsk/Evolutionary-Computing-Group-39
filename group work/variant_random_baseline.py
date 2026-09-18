@@ -1,4 +1,4 @@
-"""Random-search baseline runner: 5 seeds, same evaluation budget as the EA,
+"""Random-search baseline runner: 10 seeds, same evaluation budget as the EA,
 one CSV per seed in results/random/seed_<N>.csv."""
 
 import csv
@@ -15,7 +15,7 @@ console = Console()
 
 EVALUATIONS: int = 10_100
 LOG_EVERY: int = 100
-SEEDS: list[int] = [42, 43, 44, 45, 46]
+SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50] 
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "random"
