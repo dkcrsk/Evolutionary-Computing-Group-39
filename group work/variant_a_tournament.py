@@ -70,6 +70,7 @@ BUDGET: int = 100  # generations
 NUM_MODULES: int = 20  # module budget per body, matches template
 MAX_DEPTH: int = 12  # cap tree depth to control bloat
 TOURNAMENT_K: int = 5  # fixed hyperparameter
+ELITE_COUNT: int = 2  # survivors guaranteed from the OLD population each gen; rest is fully replaced by offspring
 SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover
 
 SEEDS: list[int] = [42, 43, 44, 45, 46]
@@ -147,6 +148,7 @@ def create_individual() -> Individual:
     ind = Individual()
     ind.genotype = genome.to_dict()
     ind.tags["ps"] = False
+    ind.tags["just_bred"] = False  # not offspring -- eligible as an elite candidate
     return ind
 
 
@@ -210,6 +212,13 @@ def mutate_body(genome: TreeGenome) -> TreeGenome:
 
 
 def reproduction(population: Population) -> Population:
+    # Everyone currently in the population is "old" as of this generation --
+    # only individuals created below (this generation's offspring) get
+    # just_bred=True. Elitism in survivor_selection reads this flag to tell
+    # old survivors apart from brand-new children.
+    for ind in population:
+        ind.tags["just_bred"] = False
+
     parents = [ind for ind in population if ind.tags.get("ps", False)]
     if not parents:
         console.log("[yellow]No parents tagged -- using entire population[/yellow]")
@@ -245,6 +254,7 @@ def reproduction(population: Population) -> Population:
         child = Individual()
         child.genotype = child_genome.to_dict()
         child.tags["ps"] = False
+        child.tags["just_bred"] = True  # this generation's offspring
         offspring.append(child)
 
     population.extend(offspring)
@@ -252,12 +262,35 @@ def reproduction(population: Population) -> Population:
 
 
 def survivor_selection(population: Population) -> Population:
-    population = population.sort(sort="min", attribute="fitness_")
-    survivors = population[:POP_SIZE]
+    """Elitism + generational replacement (partial truncation pilot).
+
+    Keeps the best ELITE_COUNT individuals from the OLD population
+    (pre-reproduction), then fills the rest of POP_SIZE entirely from this
+    generation's offspring -- old, non-elite individuals are NOT eligible to
+    survive, unlike plain mu+lambda truncation. This removes the safety net
+    that could otherwise mask a real difference between selection operators:
+    almost all of next generation's fitness now comes from which parents
+    were chosen to reproduce.
+    """
+
+    def _fitness_key(ind: Individual) -> float:
+        return ind.fitness_ if ind.fitness_ is not None else float("inf")
+
+    old_pool = [ind for ind in population if not ind.tags.get("just_bred", False)]
+    new_pool = [ind for ind in population if ind.tags.get("just_bred", False)]
+
+    old_pool.sort(key=_fitness_key)
+    new_pool.sort(key=_fitness_key)
+
+    elites = old_pool[:ELITE_COUNT]
+    fill_needed = POP_SIZE - len(elites)
+    survivors = elites + new_pool[:fill_needed]
+    survivor_ids = {id(ind) for ind in survivors}
+
     for ind in population:
-        if ind not in survivors:
+        if id(ind) not in survivor_ids:
             ind.alive = False
- 
+
     fits = [
         ind.fitness_
         for ind in survivors
@@ -274,7 +307,8 @@ def survivor_selection(population: Population) -> Population:
         mean_modules = float(np.mean(mods)) if mods else 0.0
         console.log(
             f"[green]Gen {_state['generation']} stats -- best={best_fitness:.4f} "
-            f"mean={mean_fitness:.4f} mean_modules={mean_modules:.2f}[/green]",
+            f"mean={mean_fitness:.4f} mean_modules={mean_modules:.2f} "
+            f"elites={len(elites)}[/green]",
         )
         _rows.append({
             "generation": _state["generation"],
