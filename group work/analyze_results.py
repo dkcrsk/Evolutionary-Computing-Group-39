@@ -124,16 +124,16 @@ def make_convergence_plot(df: pd.DataFrame) -> None:
 
     for variant in df["variant"].unique():
         sub = df[df["variant"] == variant]
-        grouped = sub.groupby("evaluations")["best_fitness"].agg(["mean", "std"]).reset_index()
-        ax.plot(grouped["evaluations"], grouped["mean"], label=variant)
+        grouped = sub.groupby("generation")["best_fitness"].agg(["mean", "std"]).reset_index()
+        ax.plot(grouped["generation"], grouped["mean"], label=variant)
         ax.fill_between(
-            grouped["evaluations"],
+            grouped["generation"],
             grouped["mean"] - grouped["std"],
             grouped["mean"] + grouped["std"],
             alpha=0.15,
         )
 
-    ax.set_xlabel("Evaluations")
+    ax.set_xlabel("Generation (100 evaluations each)")
     ax.set_ylabel("Best fitness (mean ± std across runs, lower is better)")
     ax.set_title("Convergence: fitness vs. evaluations")
     ax.legend(loc="upper right")
@@ -156,10 +156,10 @@ def make_module_count_plot(df: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(8, 5))
     for variant in df["variant"].unique():
         sub = df[df["variant"] == variant]
-        grouped = sub.groupby("evaluations")["mean_modules"].mean().reset_index()
-        ax.plot(grouped["evaluations"], grouped["mean_modules"], label=variant)
+        grouped = sub.groupby("generation")["mean_modules"].mean().reset_index()
+        ax.plot(grouped["generation"], grouped["mean_modules"], label=variant)
 
-    ax.set_xlabel("Evaluations")
+    ax.set_xlabel("Generation")
     ax.set_ylabel("Mean module count")
     ax.set_title("Body size over the course of evolution")
     ax.legend(loc="upper right")
@@ -181,19 +181,19 @@ def make_selection_pressure_plot(df: pd.DataFrame) -> None:
     for variant in df["variant"].unique():
         sub = df[df["variant"] == variant]
         grouped = (
-            sub.groupby("evaluations")["mean_parent_fitness"]
+            sub.groupby("generation")["mean_parent_fitness"]
             .agg(["mean", "std"])
             .reset_index()
         )
-        ax.plot(grouped["evaluations"], grouped["mean"], label=variant)
+        ax.plot(grouped["generation"], grouped["mean"], label=variant)
         ax.fill_between(
-            grouped["evaluations"],
+            grouped["generation"],
             grouped["mean"] - grouped["std"],
             grouped["mean"] + grouped["std"],
             alpha=0.15,
         )
 
-    ax.set_xlabel("Evaluations")
+    ax.set_xlabel("Generation")
     ax.set_ylabel("Mean parent fitness (mean ± std across runs, lower is better)")
     ax.set_title("Selection pressure: mean fitness of chosen parents")
     ax.legend(loc="upper right")
@@ -260,6 +260,8 @@ def run_significance_test(finals: pd.DataFrame, label_a: str, label_b: str) -> s
             lines.append("Both groups look roughly normal (p > 0.05) -- using a two-sided t-test.")
             t_stat, p = stats.ttest_ind(a, b, equal_var=False)
             lines.append(f"Welch's t-test: t={t_stat:.3f}, p={p:.4f}")
+            u_stat, u_p = stats.mannwhitneyu(a, b, alternative="two-sided")
+            lines.append(f"Mann-Whitney U (robustness, n=5 per group): U={u_stat:.3f}, p={u_p:.4f}")
         else:
             lines.append("At least one group deviates from normality -- using the "
                           "non-parametric Mann-Whitney U test instead.")
@@ -267,11 +269,34 @@ def run_significance_test(finals: pd.DataFrame, label_a: str, label_b: str) -> s
             lines.append(f"Mann-Whitney U: U={stat:.3f}, p={p:.4f}")
 
     lines.append("")
-    lines.append(f"{label_a} final fitness: mean={a.mean():.4f}, std={a.std():.4f}")
-    lines.append(f"{label_b} final fitness: mean={b.mean():.4f}, std={b.std():.4f}")
+    lines.append(f"{label_a} final fitness: mean={a.mean():.4f}, std={a.std(ddof=1):.4f}")
+    lines.append(f"{label_b} final fitness: mean={b.mean():.4f}, std={b.std(ddof=1):.4f}")
 
     return "\n".join(lines)
 
+def sanity_checks(df: pd.DataFrame) -> None:
+    """Verify the experiment's own rules before trusting any plot or test."""
+    ok = True
+
+    def flag(cond: bool, msg: str) -> None:
+        nonlocal ok
+        print(("PASS  " if cond else "FAIL  ") + msg)
+        ok = ok and cond
+
+    variants = list(df["variant"].unique())
+    flag(len(variants) == 3, f"3 conditions present (found {len(variants)}: {variants})")
+
+    for v, sub in df.groupby("variant"):
+        seeds = list(sub["seed"].unique())
+        flag(len(seeds) == 5, f"{v}: 5 independent runs (found {len(seeds)})")
+        for s, run in sub.groupby("seed"):
+            flag(len(run) in (100, 101), f"{v} seed {s}: full run logged (found {len(run)} rows)")
+            b = list(run.sort_values("generation")["best_fitness"])
+            flag(all(x >= y - 1e-9 for x, y in zip(b, b[1:])), f"{v} seed {s}: best-so-far never increases")
+        flag(sub["evaluations"].max() <= 10_100, f"{v}: within the 10,100-evaluation budget (max {sub['evaluations'].max()})")
+        flag(sub["mean_modules"].max() <= 21.0 + 1e-9, f"{v}: body size within 20 modules + core (max {sub['mean_modules'].max():.2f})")
+
+    print("ALL CHECKS PASSED" if ok else ">>> SOME CHECKS FAILED - do not use these results <<<")
 
 def main() -> None:
     console.rule("[bold purple]Combining results[/bold purple]")
@@ -292,6 +317,7 @@ def main() -> None:
     console.log(f"[green]Saved combined table: {combined_path} ({len(combined)} rows)[/green]")
 
     console.rule("[bold purple]Plots[/bold purple]")
+    sanity_checks(combined)
     make_convergence_plot(combined)
     make_module_count_plot(combined)
     finals = make_final_fitness_boxplot(combined)
