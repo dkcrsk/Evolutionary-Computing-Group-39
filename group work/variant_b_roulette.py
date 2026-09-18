@@ -17,7 +17,7 @@ import copy
 import csv
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 # Third-party
 import numpy as np
@@ -51,9 +51,9 @@ from ariel.body_phenotypes.robogen_lite.decoders._blueprint import (
 # Assignment fitness (from tree_edit_distance.py, same as A1_template_2026.py)
 from tree_edit_distance import mean_plus_std_tree_edit_distance
 
-# Your already-tested selection function -- reused here rather than
+# Your already-tested selection functions -- reused here rather than
 # duplicated, so this file and roulette_selection.py never drift apart.
-from roulette_selection import roulette_selection
+from roulette_selection import roulette_selection, roulette_selection_sigma
 
 install()
 console = Console()
@@ -67,14 +67,26 @@ SELECTION_K: int = 5  # sets n // k parents selected, matches Variant A's tourna
 SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover
 ELITE_COUNT: int = 2  # survivors guaranteed from the OLD population each gen; rest is fully replaced by offspring
 
+# Which weighting scheme to run this script with. Everything else (pop init,
+# crossover, mutation, pop size, module budget, eval budget, seeds) stays
+# identical across both, only this changes, isolating the weighting
+# variable the same way Variant A vs B isolates tournament vs roulette.
+#   "baseline" -- roulette_selection: beta = this generation's worst
+#                 (this IS windowing, per-generation -- see roulette_selection.py)
+#   "sigma"    -- roulette_selection_sigma: rescale by mean/std
+SelectionVariant = Literal["baseline", "sigma"]
+SELECTION_VARIANT: SelectionVariant = "sigma"
+
 SEEDS: list[int] = [42, 43, 44, 45, 46]
 
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"
-DATA = Path.cwd() / "__data__" / Path(__file__).stem
+DATA = Path.cwd() / "__data__" / f"{Path(__file__).stem}_{SELECTION_VARIANT}"
 DATA.mkdir(parents=True, exist_ok=True)
 
-RESULTS = HERE / "results" / "variant_b"
+# Separate results folder per variant so the two runs never overwrite
+# each other -- compare results/variant_b_baseline vs results/variant_b_sigma.
+RESULTS = HERE / "results" / f"variant_b_{SELECTION_VARIANT}"
 RESULTS.mkdir(parents=True, exist_ok=True)
 FIELDS = ["generation", "evaluations", "best_fitness", "mean_fitness", "mean_modules"]
 SELECTION_FIELDS = ["generation", "evaluations", "mean_parent_fitness"]
@@ -313,7 +325,11 @@ def survivor_selection(population: Population) -> Population:
 
 
 def select_parents(population: Population) -> Population:
-    return roulette_selection(population, k=SELECTION_K)
+    match SELECTION_VARIANT:
+        case "baseline":
+            return roulette_selection(population, k=SELECTION_K)
+        case "sigma":
+            return roulette_selection_sigma(population, k=SELECTION_K)
 
 
 def run_one(seed: int) -> Individual | None:
@@ -331,7 +347,7 @@ def run_one(seed: int) -> Individual | None:
         num_steps=BUDGET,
         target_population_size=POP_SIZE,
         output_folder=DATA,
-        db_file_name=f"variant_b_seed{seed}.db",
+        db_file_name=f"variant_b_{SELECTION_VARIANT}_seed{seed}.db",
     )
 
     population = Population([create_individual() for _ in range(POP_SIZE)])
@@ -376,10 +392,14 @@ def run_one(seed: int) -> Individual | None:
 
 def main() -> None:
     """Run Variant B over 5 independent seeds, as the assignment requires."""
-    console.rule("[bold purple]Variant B: Roulette-Wheel Selection[/bold purple]")
+    console.rule(
+        f"[bold purple]Variant B: Roulette-Wheel Selection "
+        f"({SELECTION_VARIANT})[/bold purple]",
+    )
     console.log(
         f"Population: {POP_SIZE}, Generations: {BUDGET}, "
-        f"Module budget: {NUM_MODULES}, Selection k: {SELECTION_K}",
+        f"Module budget: {NUM_MODULES}, Selection k: {SELECTION_K}, "
+        f"Variant: {SELECTION_VARIANT}",
     )
 
     for seed in SEEDS:
