@@ -75,7 +75,7 @@ ELITE_COUNT: int = 2  # survivors guaranteed from the OLD population each gen; r
 #                 (this IS windowing, per-generation -- see roulette_selection.py)
 #   "sigma"    -- roulette_selection_sigma: rescale by mean/std
 SelectionVariant = Literal["baseline", "sigma"]
-SELECTION_VARIANT: SelectionVariant = "sigma"
+SELECTION_VARIANT: SelectionVariant = "baseline" # no noticeable difference with 5 seeds, but baseline is more robust
 
 SEEDS: list[int] = [42, 43, 44, 45, 46]
 
