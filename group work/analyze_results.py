@@ -1,7 +1,7 @@
 """Combine results from all three conditions and produce the report's
-statistical analysis: convergence line plot, boxplot, descriptive stats,
-and a significance test comparing tournament (Variant A) vs. roulette
-(Variant B).
+statistical analysis: convergence line plot, boxplot, selection-pressure
+plot, descriptive stats, and a significance test comparing tournament
+(Variant A) vs. roulette (Variant B).
 
 Expects this layout (already produced by your teammates' scripts):
 
@@ -11,18 +11,21 @@ Expects this layout (already produced by your teammates' scripts):
         variant_b/    seed_42.csv ... seed_46.csv  (+ seed_N_selection_pressure.csv)
 
 Each seed_*.csv has: generation, evaluations, best_fitness, mean_fitness,
-mean_modules.
+mean_modules. Each seed_*_selection_pressure.csv has: generation,
+evaluations, mean_parent_fitness -- only variant_a/variant_b have these
+(the random baseline has no selection step).
 
 Usage
 -----
     uv run analyze_results.py
 
 Outputs (written to analysis_output/):
-    combined_results.csv        -- every run, every condition, one table
-    convergence_plot.png        -- fitness vs. evaluations, mean +/- std band
-    final_fitness_boxplot.png   -- final best_fitness distribution per condition
-    module_count_plot.png       -- bonus: mean_modules vs. evaluations per condition
-    summary_stats.txt           -- descriptive stats + significance test
+    combined_results.csv          -- every run, every condition, one table
+    convergence_plot.png          -- fitness vs. evaluations, mean +/- std band
+    final_fitness_boxplot.png     -- final best_fitness distribution per condition
+    module_count_plot.png         -- bonus: mean_modules vs. evaluations per condition
+    selection_pressure_plot.png   -- mean_parent_fitness vs. evaluations, tournament vs. roulette
+    summary_stats.txt             -- descriptive stats + significance test
 """
 
 from pathlib import Path
@@ -40,9 +43,17 @@ RESULTS_DIR = HERE / "results"
 OUT_DIR = HERE / "analysis_output"
 OUT_DIR.mkdir(exist_ok=True)
 
-# Maps condition key -> (folder name under results/, display label)
+# Maps condition key -> (folder name under results/, display label).
+# Order here controls plotting/legend order: tournament, roulette side by
+# side, baseline last as the reference line.
 CONDITIONS = {
+    "tournament": ("variant_a", "Tournament selection"),
+    "roulette": ("variant_b", "Roulette-wheel selection"),
     "baseline": ("random", "Random baseline"),
+}
+
+# Only these two have a selection step (and therefore a selection-pressure log).
+SELECTION_CONDITIONS = {
     "tournament": ("variant_a", "Tournament selection"),
     "roulette": ("variant_b", "Roulette-wheel selection"),
 }
@@ -77,6 +88,36 @@ def load_condition(folder_name: str, variant_label: str) -> pd.DataFrame | None:
     return combined
 
 
+def load_selection_pressure(folder_name: str, variant_label: str) -> pd.DataFrame | None:
+    """Load every seed_<N>_selection_pressure.csv under results/<folder_name>/,
+    tagged with variant. Only tournament/roulette have these.
+    """
+    folder = RESULTS_DIR / folder_name
+    if not folder.exists():
+        return None
+
+    files = sorted(folder.glob("seed_*_selection_pressure.csv"))
+    if not files:
+        console.log(
+            f"[yellow]No selection-pressure logs found for '{variant_label}' in {folder}[/yellow]",
+        )
+        return None
+
+    dfs = []
+    for f in files:
+        df = pd.read_csv(f)
+        df["variant"] = variant_label
+        # filename like seed_42_selection_pressure.csv -> seed number is stem.split("_")[1]
+        df["seed"] = int(f.stem.split("_")[1])
+        dfs.append(df)
+    combined = pd.concat(dfs, ignore_index=True)
+    console.log(
+        f"[green]Loaded {len(files)} selection-pressure log(s) for '{variant_label}' "
+        f"({len(combined)} rows)[/green]",
+    )
+    return combined
+
+
 def make_convergence_plot(df: pd.DataFrame) -> None:
     """Fitness vs. evaluations, mean +/- std band, one line per variant."""
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -95,7 +136,7 @@ def make_convergence_plot(df: pd.DataFrame) -> None:
     ax.set_xlabel("Evaluations")
     ax.set_ylabel("Best fitness (mean ± std across runs, lower is better)")
     ax.set_title("Convergence: fitness vs. evaluations")
-    ax.legend()
+    ax.legend(loc="upper right")
     fig.tight_layout()
     out_path = OUT_DIR / "convergence_plot.png"
     fig.savefig(out_path, dpi=150)
@@ -121,7 +162,7 @@ def make_module_count_plot(df: pd.DataFrame) -> None:
     ax.set_xlabel("Evaluations")
     ax.set_ylabel("Mean module count")
     ax.set_title("Body size over the course of evolution")
-    ax.legend()
+    ax.legend(loc="upper right")
     fig.tight_layout()
     out_path = OUT_DIR / "module_count_plot.png"
     fig.savefig(out_path, dpi=150)
@@ -129,8 +170,43 @@ def make_module_count_plot(df: pd.DataFrame) -> None:
     console.log(f"[green]Saved {out_path}[/green]")
 
 
+def make_selection_pressure_plot(df: pd.DataFrame) -> None:
+    """mean_parent_fitness vs. evaluations, mean +/- std band, tournament vs.
+    roulette. Shows how strongly each mechanism favours fitter parents over
+    the course of the run -- lower mean parent fitness = stronger pressure
+    toward the current best individuals (lower is better in this task).
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    for variant in df["variant"].unique():
+        sub = df[df["variant"] == variant]
+        grouped = (
+            sub.groupby("evaluations")["mean_parent_fitness"]
+            .agg(["mean", "std"])
+            .reset_index()
+        )
+        ax.plot(grouped["evaluations"], grouped["mean"], label=variant)
+        ax.fill_between(
+            grouped["evaluations"],
+            grouped["mean"] - grouped["std"],
+            grouped["mean"] + grouped["std"],
+            alpha=0.15,
+        )
+
+    ax.set_xlabel("Evaluations")
+    ax.set_ylabel("Mean parent fitness (mean ± std across runs, lower is better)")
+    ax.set_title("Selection pressure: mean fitness of chosen parents")
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    out_path = OUT_DIR / "selection_pressure_plot.png"
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    console.log(f"[green]Saved {out_path}[/green]")
+
+
 def make_final_fitness_boxplot(df: pd.DataFrame) -> pd.DataFrame:
-    """Boxplot of each run's FINAL best_fitness, one box per variant.
+    """Boxplot of each run's FINAL best_fitness, one box per variant, in the
+    order variants first appear in df["variant"] (i.e. CONDITIONS order).
 
     Returns the per-run final-fitness table (variant, seed, best_fitness),
     since the significance test needs the same numbers.
@@ -142,10 +218,12 @@ def make_final_fitness_boxplot(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
+    # preserve CONDITIONS order rather than pandas' default (often alphabetical)
+    order = [label for _, label in CONDITIONS.values() if label in finals["variant"].unique()]
+
     fig, ax = plt.subplots(figsize=(6, 5))
-    variants = finals["variant"].unique()
-    data = [finals[finals["variant"] == v]["best_fitness"].to_numpy() for v in variants]
-    ax.boxplot(data, tick_labels=variants)
+    data = [finals[finals["variant"] == v]["best_fitness"].to_numpy() for v in order]
+    ax.boxplot(data, tick_labels=order)
     ax.set_ylabel("Final best fitness (lower is better)")
     ax.set_title("Final fitness distribution per condition")
     fig.tight_layout()
@@ -217,6 +295,22 @@ def main() -> None:
     make_convergence_plot(combined)
     make_module_count_plot(combined)
     finals = make_final_fitness_boxplot(combined)
+
+    console.rule("[bold purple]Selection pressure[/bold purple]")
+    pressure_parts = []
+    for key, (folder, label) in SELECTION_CONDITIONS.items():
+        part = load_selection_pressure(folder, label)
+        if part is not None:
+            pressure_parts.append(part)
+
+    if pressure_parts:
+        pressure_combined = pd.concat(pressure_parts, ignore_index=True)
+        pressure_combined.to_csv(OUT_DIR / "combined_selection_pressure.csv", index=False)
+        make_selection_pressure_plot(pressure_combined)
+    else:
+        console.log(
+            "[yellow]No selection-pressure logs found for either variant -- skipping that plot[/yellow]",
+        )
 
     console.rule("[bold purple]Descriptive stats[/bold purple]")
     desc = finals.groupby("variant")["best_fitness"].agg(["mean", "std", "min", "max", "count"])

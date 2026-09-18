@@ -3,7 +3,7 @@ DESCRIPTIVE STATS (final best_fitness per variant)
                                mean       std        min        max  count
 variant                                                                   
 Random baseline           16.899382  0.298325  16.474166  17.140175      5
-Roulette-wheel selection  12.581041  0.317225  12.183095  12.878233      5
+Roulette-wheel selection  13.092439  0.202653  12.800000  13.288854      5
 Tournament selection      12.684471  0.428830  12.089898  13.300000      5
 
 SIGNIFICANCE TEST: TOURNAMENT vs. ROULETTE
@@ -11,9 +11,9 @@ SIGNIFICANCE TEST: TOURNAMENT vs. ROULETTE
 Comparing 'Tournament selection' (n=5) vs. 'Roulette-wheel selection' (n=5)
 
 Shapiro-Wilk normality -- Tournament selection: W=0.915, p=0.5008
-Shapiro-Wilk normality -- Roulette-wheel selection: W=0.855, p=0.2111
+Shapiro-Wilk normality -- Roulette-wheel selection: W=0.917, p=0.5106
 Both groups look roughly normal (p > 0.05) -- using a two-sided t-test.
-Welch's t-test: t=0.434, p=0.6770
+Welch's t-test: t=-1.923, p=0.1053
 
 Tournament selection final fitness: mean=12.6845, std=0.3836
-Roulette-wheel selection final fitness: mean=12.5810, std=0.2837
+Roulette-wheel selection final fitness: mean=13.0924, std=0.1813
