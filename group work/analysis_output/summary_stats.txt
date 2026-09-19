@@ -1,19 +1,19 @@
 DESCRIPTIVE STATS (final best_fitness per variant)
 
-                               mean       std        min        max  count
-variant                                                                   
-Random baseline           16.899382  0.298325  16.474166  17.140175      5
-Roulette-wheel selection  13.092439  0.202653  12.800000  13.288854      5
-Tournament selection      12.590931  0.266948  12.380625  13.055295      5
+                                  mean       std        min        max  count
+variant                                                                      
+Random baseline              16.871010  0.256665  16.474166  17.160108     10
+Tournament selection         12.455848  0.314384  12.183095  13.193738     10
+Windowed roulette selection  12.893428  0.294875  12.547723  13.288854     10
 
 SIGNIFICANCE TEST: TOURNAMENT vs. ROULETTE
 
-Comparing 'Tournament selection' (n=5) vs. 'Roulette-wheel selection' (n=5)
+Comparing 'Tournament selection' (n=10) vs. 'Windowed roulette selection' (n=10)
 
-Shapiro-Wilk normality -- Tournament selection: W=0.771, p=0.0462
-Shapiro-Wilk normality -- Roulette-wheel selection: W=0.917, p=0.5106
+Shapiro-Wilk normality -- Tournament selection: W=0.806, p=0.0170
+Shapiro-Wilk normality -- Windowed roulette selection: W=0.875, p=0.1152
 At least one group deviates from normality -- using the non-parametric Mann-Whitney U test instead.
-Mann-Whitney U: U=2.000, p=0.0317
+Mann-Whitney U: U=13.500, p=0.0064
 
-Tournament selection final fitness: mean=12.5909, std=0.2669
-Roulette-wheel selection final fitness: mean=13.0924, std=0.2027
+Tournament selection final fitness: mean=12.4558, std=0.3144
+Windowed roulette selection final fitness: mean=12.8934, std=0.2949
