@@ -1,0 +1,32 @@
+% ---- Table 1: FPS transform pilot ----
+\begin{table}[t]
+\caption{Selecting the FPS transform: windowed vs. sigma-scaled roulette ($c{=}2$), paired over seeds 42--46. All other components identical; lower fitness is better.}
+\label{tab:roulette-pick}
+\begin{tabular}{lcc}
+\toprule
+ & Windowing & Sigma scaling \\
+\midrule
+Mean final fitness & 13.09 & 13.00 \\
+Std across seeds & 0.20 & 0.55 \\
+Per-seed wins & 3/5 & 2/5 \\
+Best single run & 12.80 & 12.23 \\
+\midrule
+\multicolumn{3}{l}{Wilcoxon signed-rank (paired): $W{=}7.0$, $p{=}1.00$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---- Table 2: main comparison ----
+\begin{table}[t]
+\caption{Final best fitness (mean tree-edit distance $+$ std to the five targets; lower is better) over 10 independent runs per condition, equal budget of 10{,}100 evaluations.}
+\label{tab:main}
+\begin{tabular}{lcccc}
+\toprule
+Condition & Mean & Std & Best & $n$ \\
+\midrule
+Tournament selection & 12.46 & 0.31 & 12.18 & 10 \\
+Windowed roulette selection & 12.89 & 0.29 & 12.55 & 10 \\
+Random baseline & 16.87 & 0.26 & 16.47 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -15,7 +15,7 @@ console = Console()
 
 EVALUATIONS: int = 10_100
 LOG_EVERY: int = 100
-SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50] 
+SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50, 51] 
 
 HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "random"
