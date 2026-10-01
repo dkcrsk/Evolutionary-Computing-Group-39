@@ -22,12 +22,12 @@ import a2_core as core  # noqa: E402
 from ariel.ec import set_seed  # noqa: E402
 
 # EA parameters (sigma and population must be IDENTICAL across variants)
-POP_SIZE = 20        # toy for building; real values come from sigma sweep + pilot
-GENERATIONS = 15
+POP_SIZE = 100        # toy for building; real values come from sigma sweep + pilot
+GENERATIONS = 100
 TOURNAMENT_K = 3
 ELITE_COUNT = 2
 CROSSOVER_P = 0.5    # per-gene chance to take parent 1's gene
-MUTATION_SIGMA = 0.1
+MUTATION_SIGMA = 0.05
 INIT_SIGMA = 0.5
 
 CONDITION = "uniform"

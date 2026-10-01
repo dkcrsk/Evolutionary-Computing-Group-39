@@ -23,3 +23,5 @@ Every combination tried gets a row. Data lives in CSVs; decisions live here.
 | Oct 1 | toy smoke test, uniform | pop20 x 15g, sigma 0.1 | 42 | 1.4741 | pipeline works; checkpoints + video OK |
 | Oct 1 | sigma sweep r1 | pop50 x 40g, sigma 0.05 | 42,43 | 0.5410 / 0.6199 | avg 0.58; s42 plateaued gen 27-40 |
 | Oct 1 | sigma sweep r2 | pop50 x 40g, sigma 0.1 | 42,43 | 1.2814 / 0.5962 | avg 0.94; s42 stuck at 1.41 for 16 gens; 0.05 leading |
+| Oct 1 | sigma sweep r3 | pop50 x 40g, sigma 0.2 | 42,43 | 1.3532 / 0.9865 | avg 1.17; s42 frozen at gen-0 best for 21 gens - mutation destroying progress |
+| Oct 1 | SIGMA FROZEN | 0.05 -> 0.58, 0.1 -> 0.94, 0.2 -> 1.17 (avg best) | 42,43 | sigma = 0.05 | monotone: smaller better on mean AND seed-consistency; tuning effort 6 half-scale runs |
