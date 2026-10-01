@@ -21,3 +21,4 @@ Every combination tried gets a row. Data lives in CSVs; decisions live here.
 | date | what | settings | seeds | result (best) | decision/note |
 |---|---|---|---|---|---|
 | Oct 1 | toy smoke test, uniform | pop20 x 15g, sigma 0.1 | 42 | 1.4741 | pipeline works; checkpoints + video OK |
+| Oct 1 | sigma sweep r1 | pop50 x 40g, sigma 0.05 | 42,43 | 0.5410 / 0.6199 | avg 0.58; s42 plateaued gen 27-40 |
