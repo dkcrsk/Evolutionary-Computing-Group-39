@@ -73,7 +73,7 @@ TOURNAMENT_K: int = 5  # fixed hyperparameter
 ELITE_COUNT: int = 2  # survivors guaranteed from the OLD population each gen; rest is fully replaced by offspring
 SEXUAL_REPRODUCTION_RATE: float = 0.5  # chance of crossover
 
-SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50] 
+SEEDS: list[int] = [42, 43, 44, 45, 46, 47, 48, 49, 50, 51] 
 
 HERE = Path(__file__).parent
 TARGET_DIR = HERE / "target_bodies"
