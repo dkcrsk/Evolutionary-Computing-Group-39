@@ -28,3 +28,10 @@ Every combination tried gets a row. Data lives in CSVs; decisions live here.
 | Oct 2 | GRID uniform s42 | pop100 x 100g, sigma 0.05 | 42 | 0.0179 | plateau ~gen 59; robot reaches the target (1.8 cm) |
 | Oct 2 | GRID uniform s43 | pop100 x 100g, sigma 0.05 | 43 | 0.2028 | still improving at gen 94 -> keep 100 gens |
 | Oct 2 | BUDGET CONFIRMED | pop 100 x 100 generations | - | - | one full run ~46 min at 0.28 s/eval |
+
+## BODY CORRECTION (2 Oct)
+Template imported the 8-hinge gecko from gecko.py; the assignment requires the John Set
+body, and john_set.py provides gecko() with 6 hinges. Core import fixed. All runs before
+this point used the wrong body and are archived in archive_8hinge/ (kept as pipeline
+evidence, excluded from all analysis). New dimensions: 17 inputs, 6 outputs, genotype 138.
+Sigma will be re-tuned for the new search space (per-variant, Optuna, seeds 101-102).

@@ -14,7 +14,7 @@ import mujoco as mj
 import numpy as np
 from mujoco import viewer
 
-from ariel.body_phenotypes.robogen_lite.prebuilt_robots.gecko import gecko
+from ariel.body_phenotypes.robogen_lite.prebuilt_robots.john_set import gecko
 from ariel.simulation.environments import SimpleFlatWorld
 from ariel.utils.renderers import video_renderer
 from ariel.utils.runners import simple_runner
