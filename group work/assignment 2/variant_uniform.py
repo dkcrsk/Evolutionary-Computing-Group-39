@@ -27,7 +27,7 @@ GENERATIONS = 100
 TOURNAMENT_K = 3
 ELITE_COUNT = 2
 CROSSOVER_P = 0.5    # per-gene chance to take parent 1's gene
-MUTATION_SIGMA = 0.05
+MUTATION_SIGMA = 0.0208
 INIT_SIGMA = 0.5
 
 CONDITION = "uniform"

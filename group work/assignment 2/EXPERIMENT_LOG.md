@@ -35,3 +35,7 @@ body, and john_set.py provides gecko() with 6 hinges. Core import fixed. All run
 this point used the wrong body and are archived in archive_8hinge/ (kept as pipeline
 evidence, excluded from all analysis). New dimensions: 17 inputs, 6 outputs, genotype 138.
 Sigma will be re-tuned for the new search space (per-variant, Optuna, seeds 101-102).
+
+
+| Oct 3 | optuna sigma study (uniform) | 10 trials x seeds 101,102, pop50x40 | - | best sigma 0.0208 (mean 0.658) | small-sigma region wins again; trials csv in results_tuning/ |
+| Oct 3 | MISTAKE + archive | ran 42,43 full scale BEFORE freezing sigma (used 0.05) | 42,43 | 0.4250 / 0.3409 | archived in archive_sigma005_fullscale/, excluded from grid; rerun with 0.0208 |
