@@ -42,3 +42,8 @@ Sigma will be re-tuned for the new search space (per-variant, Optuna, seeds 101-
 | Oct 3 | GRID uniform s42 | pop100x100, sigma 0.0208, john_set body | 42 | 0.5092 | improving till gen 91; mean 0.81 |
 | Oct 3 | GRID uniform s43 | pop100x100, sigma 0.0208, john_set body | 43 | 0.1966 | improving till gen 89; mean 0.77; budget 100 confirmed on new body |
 | Oct 3 | note | archived sigma-0.05 runs vs tuned: mixed per seed, tuned better on avg + population means | - | - | utility flat in 0.02-0.05 region |
+| Oct 3 | tier2 zero-shot | flat champion s43 replayed in OlympicArena | - | 1.0831 | partially transfers, stuck in rugged zone |
+| Oct 3 | tier2 probe A gecko+olympic | pop50x40, sigma 0.0208 | 42 | 1.2972 | improving steadily, no wall; zero-shot champ (1.08) still ahead at probe budget |
+
+| Oct 3 | tier2 probe B spider+flat | pop50x40, sigma 0.0208 | 42 | 0.1140 | spider walks easily - beats gecko full-budget at half budget; gecko-tuned sigma transfers |
+| Oct 3 | note | results_test/ = day-1 toy prototype outputs (8-hinge), moved to archive |

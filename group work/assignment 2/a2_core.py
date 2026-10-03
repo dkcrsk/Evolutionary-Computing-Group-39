@@ -14,8 +14,8 @@ import mujoco as mj
 import numpy as np
 from mujoco import viewer
 
-from ariel.body_phenotypes.robogen_lite.prebuilt_robots.john_set import gecko
-from ariel.simulation.environments import SimpleFlatWorld
+from ariel.body_phenotypes.robogen_lite.prebuilt_robots.john_set import gecko, spider_8
+from ariel.simulation.environments import OlympicArena, SimpleFlatWorld
 from ariel.utils.renderers import video_renderer
 from ariel.utils.runners import simple_runner
 from ariel.utils.video_recorder import VideoRecorder
@@ -35,12 +35,12 @@ USE_TIME_INPUT = True     # sin/cos of time -> a beat for the gait
 OMEGA = 2.0 * np.pi       # beat speed: 1 cycle per second
 
 
-def build_world(mark_target=True):
-    world = SimpleFlatWorld()
+def build_world(mark_target=True, world="flat"):
+    w = OlympicArena() if world == "olympic" else SimpleFlatWorld()
     if mark_target:
         # purely visual red sphere at the target; no collisions, no physics
         try:
-            g = world.spec.worldbody.add_geom()
+            g = w.spec.worldbody.add_geom()
             g.name = "target_marker"
             g.type = mj.mjtGeom.mjGEOM_SPHERE
             g.size[0] = 0.06
@@ -50,11 +50,11 @@ def build_world(mark_target=True):
             g.conaffinity = 0
         except Exception as err:  # marker must never break an experiment
             print(f"target marker skipped: {err}")
-    return world
+    return w
 
 
-def build_robot():
-    return gecko()
+def build_robot(body="gecko"):
+    return spider_8() if body == "spider" else gecko()
 
 
 def controller_inputs(data):
@@ -76,13 +76,13 @@ def nn_controller(model, data, weights):
     return outputs * (np.pi / 2)
 
 
-def get_sizes():
-    """Input size, output size and genotype length for the current settings."""
+def get_sizes(body="gecko", world="flat"):
+    """Input size, output size and genotype length for the given body/world."""
     mj.set_mjcb_control(None)
-    world = build_world(mark_target=False)
-    robot = build_robot()
-    world.spawn(robot.spec, position=SPAWN_POS, correct_collision_with_floor=True)
-    model = world.spec.compile()
+    w = build_world(mark_target=False, world=world)
+    robot = build_robot(body)
+    w.spawn(robot.spec, position=SPAWN_POS, correct_collision_with_floor=True)
+    model = w.spec.compile()
     data = mj.MjData(model)
     n_in = len(controller_inputs(data))
     n_out = model.nu
@@ -95,18 +95,14 @@ def to_matrices(flat, n_in, n_out):
             flat[cut:].reshape(HIDDEN_SIZE, n_out)]
 
 
-def evaluate(flat, n_in, n_out, mode="simple"):
-    """One rollout with the given genotype; returns fitness (lower = better).
-
-    Fitness = PLAIN distance to target in the x-y plane at the end.
-    (If the team decides delta distance, only this function changes.)
-    """
+def evaluate(flat, n_in, n_out, mode="simple", body="gecko", world="flat"):
+    """One rollout with the given genotype; returns fitness (lower = better)."""
     weights = to_matrices(flat, n_in, n_out)
     mj.set_mjcb_control(None)
-    world = build_world()
-    robot = build_robot()
-    world.spawn(robot.spec, position=SPAWN_POS, correct_collision_with_floor=True)
-    model = world.spec.compile()
+    w = build_world(world=world)
+    robot = build_robot(body)
+    w.spawn(robot.spec, position=SPAWN_POS, correct_collision_with_floor=True)
+    model = w.spec.compile()
     data = mj.MjData(model)
     mj.mj_resetData(model, data)
     mj.mj_forward(model, data)
