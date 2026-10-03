@@ -39,3 +39,6 @@ Sigma will be re-tuned for the new search space (per-variant, Optuna, seeds 101-
 
 | Oct 3 | optuna sigma study (uniform) | 10 trials x seeds 101,102, pop50x40 | - | best sigma 0.0208 (mean 0.658) | small-sigma region wins again; trials csv in results_tuning/ |
 | Oct 3 | MISTAKE + archive | ran 42,43 full scale BEFORE freezing sigma (used 0.05) | 42,43 | 0.4250 / 0.3409 | archived in archive_sigma005_fullscale/, excluded from grid; rerun with 0.0208 |
+| Oct 3 | GRID uniform s42 | pop100x100, sigma 0.0208, john_set body | 42 | 0.5092 | improving till gen 91; mean 0.81 |
+| Oct 3 | GRID uniform s43 | pop100x100, sigma 0.0208, john_set body | 43 | 0.1966 | improving till gen 89; mean 0.77; budget 100 confirmed on new body |
+| Oct 3 | note | archived sigma-0.05 runs vs tuned: mixed per seed, tuned better on avg + population means | - | - | utility flat in 0.02-0.05 region |
