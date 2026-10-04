@@ -21,28 +21,43 @@ Status on Oct 2. Deadline: **13 Oct 2026, 09:00** (−0.5 points per day late).
 
 - **Body**
     - Recheck the body type: we must use the gecko from the **John Set**.
-    - Needs the one-line change in `a2_core.py` (see 8.1); not applied yet.
+    - Done by Sai on Oct 2: `a2_core.py` now imports `gecko` from `john_set` (17 inputs, 6 outputs, genotype 138).
+    - All earlier runs used the wrong body; archived in `archive_8hinge/`.
 
 - **Arithmetic crossover**
     - Weighted at **0.5** (child = midpoint of the two parents).
     - Sigma: find the best value for arithmetic separately, using **Optuna**.
         - Optuna is not installed in the project environment yet.
         - It is used only to tune sigma, not as the search algorithm.
-    - **Optuna settings (decided)**
+    - **Optuna settings (final, Sai, Oct 3)** — replaces the Oct 2 choice of 3 trials on seeds 42/43
 
         | Setting | Value |
         |---|---|
-        | Sigma range | 0.01 to 0.5 |
-        | Trials | 3 |
-        | Seeds per trial | 42 and 43 |
+        | Sigma range | 0.01 to 0.3, log scale (as coded in `tune_sigma.py`) |
+        | Trials | 10 |
+        | Seeds per trial | 101 and 102 (the grid seeds 42 to 46 stay unseen) |
         | Scale of each run | pop 50 × 40 generations (1,970 evaluations) |
+        | Score of a trial | mean of the two final best fitnesses |
 
-        - Cost: 3 trials × 2 seeds = 6 runs, about 16 min each, so about 1.6 hours.
-        - Same effort as Sai's sweep for uniform (also 6 half-scale runs).
-        - Watch out: with only 3 trials Optuna does not "learn" yet.
-            - Its default sampler picks the first 10 trials at random.
-            - So the 3 sigmas would be 3 random values in the range.
-            - Alternative with the same cost: give Optuna 3 fixed values spread over the range (e.g. 0.01, 0.07, 0.5).
+        - Equal tuning effort for both variants: same trials, same seeds, same scale.
+        - Uniform result: **sigma = 0.0208** (mean best 0.658), now frozen in `variant_uniform.py`.
+        - Arithmetic: `tune_sigma_arithmetic.py` = exact copy of `tune_sigma.py` with `import variant_arithmetic as v`.
+            - Ran on Ori's laptop, Oct 3 23:27 to Oct 4 04:27 (about 30 min per trial).
+            - Output: `results_tuning/arithmetic_sigma_trials.csv`.
+        - Arithmetic result: **sigma = 0.0246** (mean best 0.657), now set in `variant_arithmetic.py`.
+            - Almost the same as uniform (0.0208, mean best 0.658).
+            - Very noisy: 0.016 scored about 1.25 and 0.019 scored 1.08, while 0.025 scored 0.66.
+            - A second good region around 0.07 to 0.14 (best 0.79 at 0.110); 0.235 was bad (1.23).
+            - For the report: the tuned value is the best of 10 noisy trials, not a sharp optimum.
+        - Grid seeds 42 and 43 (arithmetic, full scale, sigma 0.0246): Oct 4, 04:30 to 05:42, in parallel, 0.42 s/eval.
+
+            | Seed | Arithmetic final best | Uniform final best |
+            |---|---|---|
+            | 42 | 1.3697 | 0.5092 |
+            | 43 | 0.6316 | 0.1966 |
+
+            - Arithmetic was still improving at generation 98 to 100 (uniform stopped improving around 90).
+            - Final population fitness std: arithmetic 0.07 / 0.09, uniform 0.24 / 0.31, which fits arithmetic shrinking diversity.
 
 - **Extra measurement: population diversity**
     - Logged per generation.
@@ -301,13 +316,11 @@ One copy of the truth: every variant imports it, so all conditions run on exactl
     - Stopping: fixed 100 generations.
     - Body: gecko from the John Set.
     - Arithmetic seeds 42 and 43: Ori.
-    - Optuna settings: range 0.01 to 0.5, 3 trials, seeds 42 and 43, pop 50 × 40 generations.
+    - Optuna settings (Oct 3): range 0.01 to 0.3, 10 trials, seeds 101 and 102, pop 50 × 40 generations.
 
 - **For the group to decide**
     - Who runs arithmetic seeds 44 to 46?
     - A third condition without crossover (listed as open in the log)?
-    - Sigma for uniform: keep 0.05 from the old body, or re-tune it on the John Set gecko the same way as arithmetic?
-    - Optuna with 3 trials: random values (default) or 3 fixed values over the range?
 
 - **The Optuna settings, explained** (background for the decision above)
     - How Optuna works
@@ -365,7 +378,7 @@ Ordered by how much a "no" would cost us. The first three could force re-running
         - `john_set.gecko`: 6 joints, 13 `qpos` values.
     - Ask: is the template's gecko accepted, or must we switch to the `john_set` one?
     - If we must switch: genotype length changes (162 → 138) and all runs are redone.
-    - **Our position (Oct 2): switch to the `john_set` one. Not done yet; Sai has to agree first because it changes `a2_core.py`.**
+    - **Resolved (Oct 2): switched to the `john_set` gecko by Sai. The measurements below were taken before the switch.**
         - The change is one line in `a2_core.py`
             - `from ...prebuilt_robots.gecko import gecko` → `from ...prebuilt_robots.john_set import gecko`
         - Measured with the `john_set` gecko, without editing the shared file
