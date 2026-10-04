@@ -47,3 +47,6 @@ Sigma will be re-tuned for the new search space (per-variant, Optuna, seeds 101-
 
 | Oct 3 | tier2 probe B spider+flat | pop50x40, sigma 0.0208 | 42 | 0.1140 | spider walks easily - beats gecko full-budget at half budget; gecko-tuned sigma transfers |
 | Oct 3 | note | results_test/ = day-1 toy prototype outputs (8-hinge), moved to archive |
+| Oct 4 | optuna sigma study (arithmetic) | 10 trials x seeds 101,102, pop50x40 | - | best sigma 0.0246 (mean 0.657) | very noisy (0.0194 -> 1.08, 0.0246 -> 0.66); trials csv in results_tuning/ |
+| Oct 4 | GRID arithmetic s42 | pop100x100, sigma 0.0246, john_set body | 42 | 1.3697 | still improving at gen 100; final pop mean 1.45 |
+| Oct 4 | GRID arithmetic s43 | pop100x100, sigma 0.0246, john_set body | 43 | 0.6316 | still improving at gen 98; final pop mean 0.81 |
