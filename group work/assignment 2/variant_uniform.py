@@ -43,6 +43,11 @@ def crossover(p1, p2, rng):
     return np.where(mask, p1, p2)
 
 
+def diversity(pop):
+    """Population diversity: std of each gene across the population, averaged over genes."""
+    return float(np.mean(np.std(np.array(pop), axis=0, ddof=1)))
+
+
 def main(seed):
     rng = np.random.default_rng(seed)
     set_seed(seed)
@@ -84,9 +89,10 @@ def main(seed):
             np.savez(ckpt_dir / f"gen_{gen}.npz", flat=pop[int(np.argmin(fits))])
             improvements.append([gen, evaluations, best_f])
 
+        div = diversity(pop)
         rows.append([gen, evaluations, gen_best, float(np.mean(fits)),
-                     float(np.std(fits, ddof=1))])
-        print(f"gen {gen:3d}  best {gen_best:.4f}  mean {np.mean(fits):.4f}")
+                     float(np.std(fits, ddof=1)), div])
+        print(f"gen {gen:3d}  best {gen_best:.4f}  mean {np.mean(fits):.4f}  div {div:.4f}")
 
     elapsed = time.time() - t0
     print(f"\n{evaluations} evals in {elapsed:.0f} s -> {elapsed/evaluations:.2f} s/eval")
@@ -96,7 +102,7 @@ def main(seed):
     with open(out_dir / f"seed_{seed}.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["generation", "evaluations", "best_fitness",
-                    "mean_fitness", "std_fitness"])
+                    "mean_fitness", "std_fitness", "diversity"])
         w.writerows(rows)
     with open(ckpt_dir / "checkpoints.csv", "w", newline="") as f:
         w = csv.writer(f)
