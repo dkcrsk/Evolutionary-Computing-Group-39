@@ -1,4 +1,4 @@
-"""Quick summary of the per-seed CSVs in results/arithmetic and results/uniform.
+"""Quick summary of the per-seed CSVs in results/arithmetic, uniform and random.
 
     python check_results.py            # final generation of every seed
     python check_results.py 50         # same, but at generation 50
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 RESULTS = Path(__file__).parent / "results"
-CONDITIONS = ["arithmetic", "uniform"]
+CONDITIONS = ["arithmetic", "uniform", "random"]
 COLS = ["best_fitness", "mean_fitness", "std_fitness", "diversity"]
 
 
